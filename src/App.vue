@@ -10,13 +10,13 @@
     </select>
   </div>
   <button v-if="selectedFile.length > 0" @click="toggleEditMode"
-    class="absolute top-[25px] right-1/2 md:right-[25px] transform translate-x-1/2 md:translate-x-0 bg-orange-custom text-white font-semibold px-4 py-2 rounded-xl border border-white ">
+    class="absolute top-[60px] right-1/2 md:right-[25px] transform translate-x-1/2 md:translate-x-0 bg-orange-custom text-white font-semibold px-4 py-2 rounded-xl border border-white ">
     {{ editMode ? 'Toggle placement off' : 'Place Marker' }}
   </button>
-  <button v-if="editMode" @click="savePosition"
-    class="bg-white absolute top-[85px] md:top-[25px] right-1/2 md:right-[225px] transform translate-x-1/2 md:translate-x-0 font-semibold px-4 py-2 rounded-xl border border-orange-custom text-orange-custom">
+  <!-- <button v-if="editMode" @click="savePosition"
+    class="bg-white absolute top-[110px] md:top-[25px] right-1/2 md:right-[225px] transform translate-x-1/2 md:translate-x-0 font-semibold px-4 py-2 rounded-xl border border-orange-custom text-orange-custom">
     Save Position
-  </button>
+  </button> -->
 </template>
 
 <script setup>
@@ -132,7 +132,7 @@ function onMouseMove(event) {
 
 // Function to add a custom polygon at a given 3D position
 function addCustomPolygon(position, normal) {
-  const radius = 0.5;  // You can adjust the radius as needed
+  const radius = 0.5;
 
   // Create a sphere geometry
   const geometry = new THREE.SphereGeometry(radius, 32, 32); // 32 segments for a smoother sphere
@@ -158,13 +158,8 @@ function addCustomPolygon(position, normal) {
   // Add the sphere to the scene
   world.scene.three.add(sphere);
 
-  const label = createTextLabel("CUSTOOM TEXT");
-  label.position.set(position.x, position.y + radius + 0.5, position.z); // Position label above the sphere
-  world.scene.three.add(label);
-
   console.log("Sphere created:", sphere);
-
-  window.flutter_inappwebview.callHandler('modelPostion', sphere.normal.x, sphere.normal.y, sphere.normal.z);
+  window.flutter_inappwebview.callHandler('modelPostion',  sphere.position.x, sphere.position.y,  sphere.position.z);
 }
 
 function getClosestFragment(intersectPoint) {
@@ -271,12 +266,15 @@ function onDocumentMouseClick(event) {
 
       // Find the closest fragment to the clicked point
       const { closestFragment, fragmentNormal } = getClosestFragment(intersectPoint);
+
       if (sphere) {
         // If the sphere exists, move it to the clicked position
         sphere.position.copy(intersectPoint);
-        console.log("Sphere moved to:", intersectPoint);
+        window.flutter_inappwebview.callHandler('modelPostion',  sphere.position.x, sphere.position.y,  sphere.position.z);
+
       } else {
         // If the sphere does not exist, create it at the clicked position
+        
         addCustomPolygon(intersectPoint, fragmentNormal);
         // addSphere(intersectPoint);
       }
@@ -309,7 +307,13 @@ async function loadIfc() {
 
     // Add the new model to the scene
     world.scene.three.add(currentModel); // Add new model to the scene
+    selectBuilding(selectedFile.value);
+
   }
+}
+
+function selectBuilding(buildingId) {
+  window.flutter_inappwebview.callHandler('selectBuilding', buildingId);
 }
 
 watch(selectedFile, async () => {
