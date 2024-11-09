@@ -17,6 +17,14 @@
     class="bg-white absolute top-[85px] md:top-[25px] right-1/2 md:right-[225px] transform translate-x-1/2 md:translate-x-0 font-semibold px-4 py-2 rounded-xl border border-orange-custom text-orange-custom">
     Save Position
   </button>
+  <div style="position: absolute; bottom: 20px; right: 20px; display: flex; flex-direction: column;">
+    <button @click="moveCamera('up')">⬆️</button>
+    <div style="display: flex; justify-content: center;">
+      <button @click="moveCamera('left')">⬅️</button>
+      <button @click="moveCamera('right')">➡️</button>
+    </div>
+    <button @click="moveCamera('down')">⬇️</button>
+  </div>
 </template>
 
 <script setup>
@@ -69,27 +77,27 @@ let highlightedFragment = null;
 let sphere = null;
 let currentModel = null;
 
-function highlightFragment(fragment) {
-  if (fragment && fragment.material[0] && !editMode.value) {
-    // Check if fragment already has an original color stored
-    if (!fragment.userData.originalMaterial) {
-      // Clone the original material and store it in userData for restoration
-      fragment.userData.originalMaterial = fragment.material[0];
-    }
+function moveCamera(direction) {
+  const camera = world.camera.three;
+  const moveStep = 2; // Adjusts camera movement speed
 
-    // Create a new material with a highlighted color and assign it to the fragment
-    const highlightedMaterial = fragment.material[0].clone();
-    highlightedMaterial.color.set(0x00ff00); // Set highlight color (e.g., red)
-    fragment.material[0] = highlightedMaterial; // Apply the new material to the fragment
+  switch (direction) {
+    case 'up':
+      camera.position.y += moveStep;
+      break;
+    case 'down':
+      camera.position.y -= moveStep;
+      break;
+    case 'left':
+      camera.position.x -= moveStep;
+      break;
+    case 'right':
+      camera.position.x += moveStep;
+      break;
   }
-}
 
-function removeHighlight() {
-  if (highlightedFragment && highlightedFragment.userData.originalMaterial) {
-    // Restore the original material from userData
-    highlightedFragment.material[0] = highlightedFragment.userData.originalMaterial;
-    highlightedFragment.userData.originalMaterial = null; // Clear the stored reference
-  }
+  // Update the camera controls to reflect the new position
+  world.camera.controls.update();
 }
 
 function onMouseMove(event) {
@@ -158,7 +166,6 @@ function addCustomPolygon(position, normal) {
   // Add the sphere to the scene
   world.scene.three.add(sphere);
 
-  const label = createTextLabel("CUSTOOM TEXT");
   label.position.set(position.x, position.y + radius + 0.5, position.z); // Position label above the sphere
   world.scene.three.add(label);
 
@@ -322,6 +329,9 @@ function savePosition() {
 
 // Initialize the OBC world when the component is mounted
 onMounted(async () => {
+  const searchParams = new URLSearchParams(window.location.search);
+  const fileParam = searchParams.get("modelId");
+
   if (!container.value) return;
 
   // Create components
@@ -391,6 +401,29 @@ onBeforeUnmount(() => {
   components = null;
   world = null;
 });
+
+function highlightFragment(fragment) {
+  if (fragment && fragment.material[0] && !editMode.value) {
+    // Check if fragment already has an original color stored
+    if (!fragment.userData.originalMaterial) {
+      // Clone the original material and store it in userData for restoration
+      fragment.userData.originalMaterial = fragment.material[0];
+    }
+
+    // Create a new material with a highlighted color and assign it to the fragment
+    const highlightedMaterial = fragment.material[0].clone();
+    highlightedMaterial.color.set(0x00ff00); // Set highlight color (e.g., red)
+    fragment.material[0] = highlightedMaterial; // Apply the new material to the fragment
+  }
+}
+
+function removeHighlight() {
+  if (highlightedFragment && highlightedFragment.userData.originalMaterial) {
+    // Restore the original material from userData
+    highlightedFragment.material[0] = highlightedFragment.userData.originalMaterial;
+    highlightedFragment.userData.originalMaterial = null; // Clear the stored reference
+  }
+}
 </script>
 
 <style scoped>
