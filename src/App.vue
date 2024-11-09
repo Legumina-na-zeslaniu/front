@@ -50,6 +50,7 @@ let ifcFiles = [
   'https://maciejaroslaw.github.io/YhdistettyTATE_ARK_1.ifc',
   'https://maciejaroslaw.github.io/2_simple_wall_1731162115.0929956.ifc',
   'https://maciejaroslaw.github.io/model-1731162225487.ifc',
+  'https://maciejaroslaw.github.io/output.ifc',
 ]
 
 let selectedFile = ref('')
@@ -162,6 +163,8 @@ function addCustomPolygon(position, normal) {
   world.scene.three.add(label);
 
   console.log("Sphere created:", sphere);
+
+  window.flutter_inappwebview.callHandler('modelPostion', sphere.normal.x, sphere.normal.y, sphere.normal.z);
 }
 
 function getClosestFragment(intersectPoint) {
@@ -366,7 +369,7 @@ onMounted(async () => {
     world.camera.three.updateProjectionMatrix();
 
     container.value.addEventListener("click", onDocumentMouseClick);
-    container.value.addEventListener("mousemove", onMouseMove);
+    // container.value.addEventListener("mousemove", onMouseMove);
 
     window.addEventListener("flutterInAppWebViewPlatformReady", function (event) {
       window.flutter_inappwebview.callHandler('savePosition', sphere.normal.x, sphere.normal.y, sphere.normal.z).then(function (result) {
