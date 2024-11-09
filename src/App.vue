@@ -4,7 +4,7 @@
   <div v-if="!selectedFileFromQuery"
     :class="[selectedFile.length > 0 ? 'left-2 top-2' : 'left-1/2 top-12 -translate-x-1/2']"
     class="absolute tranform max-w-[480px] p-2 bg-white rounded">
-    <select v-model="selectedFile" @change="loadIfc" id="countries"
+    <select v-model="selectedFile" id="countries"
       class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg block w-full p-2.5">
       <option selected disabled value="">Choose ifc file</option>
       <option v-for="(file, index) in ifcFiles" :value="file">{{ file }}</option>
@@ -390,7 +390,6 @@ onMounted(async () => {
 
     container.value.addEventListener("click", onDocumentMouseClick);
 
-    await loadIfc();
 
     const cameraPosition = world.camera.three.position;
     const zoomFactor = 5; // Adjust this factor for the zoom-out level
@@ -410,7 +409,7 @@ onMounted(async () => {
       });
     });
 
-    console.log(import.meta.env);
+    await loadIfc();
   }
 });
 
