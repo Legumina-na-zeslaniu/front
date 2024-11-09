@@ -10,11 +10,11 @@
     </select>
   </div>
   <button v-if="selectedFile.length > 0" @click="toggleEditMode"
-    class="absolute bottom-[25px] right-1/2 md:right-[25px] transform translate-x-1/2 md:translate-x-0 bg-orange-custom text-white font-semibold px-4 py-2 rounded-xl border border-white ">
+    class="absolute top-[25px] right-1/2 md:right-[25px] transform translate-x-1/2 md:translate-x-0 bg-orange-custom text-white font-semibold px-4 py-2 rounded-xl border border-white ">
     {{ editMode ? 'Toggle placement off' : 'Place Marker' }}
   </button>
   <button v-if="editMode" @click="savePosition"
-    class="bg-white absolute bottom-[85px] md:bottom-[25px] right-1/2 md:right-[225px] transform translate-x-1/2 md:translate-x-0 font-semibold px-4 py-2 rounded-xl border border-orange-custom text-orange-custom">
+    class="bg-white absolute top-[85px] md:top-[25px] right-1/2 md:right-[225px] transform translate-x-1/2 md:translate-x-0 font-semibold px-4 py-2 rounded-xl border border-orange-custom text-orange-custom">
     Save Position
   </button>
 </template>
@@ -24,10 +24,32 @@ import * as WEBIFC from "web-ifc";
 import * as OBC from "@thatopen/components";
 import * as THREE from "three";
 import { onMounted, onBeforeUnmount, ref, watch } from "vue";
+import { useQuery } from '@vue/apollo-composable'
+import gql from 'graphql-tag'
+
+const { result } = useQuery(gql`
+  query inventory {
+    getAllInventory {
+      id
+      comments
+      properties {
+        field
+        value
+      }
+      files
+    }
+  }
+`)
+
+watch(result, value => {
+  console.log(value)
+})
 
 let ifcFiles = [
   'https://maciejaroslaw.github.io/Kaapelitehdas_junction.ifc',
   'https://maciejaroslaw.github.io/YhdistettyTATE_ARK_1.ifc',
+  'https://maciejaroslaw.github.io/2_simple_wall_1731162115.0929956.ifc',
+  'https://maciejaroslaw.github.io/model-1731162225487.ifc',
 ]
 
 let selectedFile = ref('')
@@ -47,7 +69,7 @@ let sphere = null;
 let currentModel = null;
 
 function highlightFragment(fragment) {
-  if (fragment && fragment.material[0]) {
+  if (fragment && fragment.material[0] && !editMode.value) {
     // Check if fragment already has an original color stored
     if (!fragment.userData.originalMaterial) {
       // Clone the original material and store it in userData for restoration
@@ -56,7 +78,7 @@ function highlightFragment(fragment) {
 
     // Create a new material with a highlighted color and assign it to the fragment
     const highlightedMaterial = fragment.material[0].clone();
-    highlightedMaterial.color.set(0xff0000); // Set highlight color (e.g., red)
+    highlightedMaterial.color.set(0x00ff00); // Set highlight color (e.g., red)
     fragment.material[0] = highlightedMaterial; // Apply the new material to the fragment
   }
 }
@@ -79,7 +101,6 @@ function onMouseMove(event) {
 
   // Check if FragmentsManager is available and if fragments are loaded
   const fragmentsManager = components.get(OBC.FragmentsManager);
-  console.log([...fragmentsManager.list]);
   if (!fragmentsManager || [...fragmentsManager.list].length === 0) {
     console.error("FragmentsManager or fragments list is not available or empty.");
     return;
@@ -94,7 +115,6 @@ function onMouseMove(event) {
 
   // Check if any fragment is intersected
   if (intersects.length > 0) {
-    console.log(intersects);
     const intersectedFragment = intersects[0].object;
 
     // Only highlight if it’s a new fragment
@@ -347,6 +367,14 @@ onMounted(async () => {
 
     container.value.addEventListener("click", onDocumentMouseClick);
     container.value.addEventListener("mousemove", onMouseMove);
+
+    window.addEventListener("flutterInAppWebViewPlatformReady", function (event) {
+      window.flutter_inappwebview.callHandler('savePosition', sphere.normal.x, sphere.normal.y, sphere.normal.z).then(function (result) {
+        console.log(result);
+      });
+    });
+
+    console.log(import.meta.env);
   }
 });
 
