@@ -1,10 +1,18 @@
 <template>
-  <div ref="container" class="container">
+  <div ref="container" class="fixed w-screen h-screen top-0 left-0">
   </div>
-  <button @click="toggleEditMode" class="btn-toggle-edit">
-    {{ editMode ? 'Toggle Edit Mode Off' : 'Place Marker' }}
+  <div class="absolute left-2 top-2 max-w-[480px] p-2 bg-white rounded">
+    <select v-model="selectedFile" @change="loadIfc" id="countries"
+      class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg block w-full p-2.5">
+      <option v-for="(file, index) in ifcFiles" :selected="index === 0" :value="file">{{ file }}</option>
+    </select>
+  </div>
+  <button @click="toggleEditMode"
+    class="absolute bottom-[25px] right-1/2 md:right-[25px] transform translate-x-1/2 md:translate-x-0 bg-orange-custom text-white font-semibold px-4 py-2 rounded-xl border border-white ">
+    {{ editMode ? 'Toggle placement off' : 'Place Marker' }}
   </button>
-  <button v-if="editMode" @click="savePosition" class="btn-save">
+  <button v-if="editMode" @click="savePosition"
+    class="bg-white absolute bottom-[85px] md:bottom-[25px] right-1/2 md:right-[225px] transform translate-x-1/2 md:translate-x-0 font-semibold px-4 py-2 rounded-xl border border-orange-custom text-orange-custom">
     Save Position
   </button>
 </template>
@@ -14,8 +22,14 @@ import * as WEBIFC from "web-ifc";
 import * as BUI from "@thatopen/ui";
 import * as OBC from "@thatopen/components";
 import * as THREE from "three";
+import { onMounted, onBeforeUnmount, ref, watch } from "vue";
 
-import { onMounted, onBeforeUnmount, ref } from "vue";
+let ifcFiles = [
+  'https://maciejaroslaw.github.io/Kaapelitehdas_junction.ifc',
+  'https://maciejaroslaw.github.io/YhdistettyTATE_ARK_1.ifc',
+]
+
+let selectedFile = ref('')
 
 const editMode = ref(false);
 function toggleEditMode() {
@@ -29,6 +43,7 @@ let raycaster = new THREE.Raycaster(); // For detecting click positions
 let mouse = new THREE.Vector2(); // For storing mouse coordinates
 let sphere = null;
 let labelSprite = null;
+let currentModel = null;
 
 
 function createTextSprite(message, fontSize = 24, color = "#ff0000") {
@@ -213,18 +228,30 @@ function onDocumentMouseClick(event) {
 }
 
 async function loadIfc() {
-  const fragments = components.get(OBC.FragmentsManager);
-  const fragmentIfcLoader = components.get(OBC.IfcLoader);
+  // Clear the current model before loading a new one
+  if (currentModel) {
+    world.scene.three.remove(currentModel); // Remove the existing model
+    currentModel.geometry?.dispose();       // Clean up geometry resources
+    currentModel.material?.dispose();       // Clean up material resources
+    currentModel = null;
+  }
 
-  const file = await fetch(
-    "https://maciejaroslaw.github.io/Kaapelitehdas_junction.ifc",
-  );
-  const data = await file.arrayBuffer();
-  const buffer = new Uint8Array(data);
-  const model = await fragmentIfcLoader.load(buffer);
-  model.name = "example";
-  world.scene.three.add(model);
+  if (selectedFile.value.length > 0) {
+    const fragments = components.get(OBC.FragmentsManager);
+    const fragmentIfcLoader = components.get(OBC.IfcLoader);
+
+    const file = await fetch(selectedFile.value); // Use the selected file
+    const data = await file.arrayBuffer();
+    const buffer = new Uint8Array(data);
+    currentModel = await fragmentIfcLoader.load(buffer); // Load the new model
+    currentModel.name = "example";
+    world.scene.three.add(currentModel); // Add new model to the scene
+  }
 }
+
+watch(selectedFile, async () => {
+  await loadIfc();
+});
 
 function savePosition() {
   console.log("SAVE");
@@ -295,14 +322,6 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
-.container {
-  width: 100vw;
-  height: 100vh;
-  position: fixed;
-  top: 0;
-  left: 0;
-}
-
 .btn-toggle-edit {
   position: absolute;
   bottom: 25px;
