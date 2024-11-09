@@ -1,13 +1,15 @@
 <template>
-  <div ref="container" class="fixed w-screen h-screen top-0 left-0">
+  <div v-show="selectedFile.length > 0" ref="container" class="fixed w-screen h-screen top-0 left-0">
   </div>
-  <div class="absolute left-2 top-2 max-w-[480px] p-2 bg-white rounded">
+  <div :class="[selectedFile.length > 0 ? 'left-2 top-2' : 'left-1/2 top-12 -translate-x-1/2']"
+    class="absolute tranform max-w-[480px] p-2 bg-white rounded">
     <select v-model="selectedFile" @change="loadIfc" id="countries"
       class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg block w-full p-2.5">
-      <option v-for="(file, index) in ifcFiles" :selected="index === 0" :value="file">{{ file }}</option>
+      <option selected disabled value="">Choose ifc file</option>
+      <option v-for="(file, index) in ifcFiles" :value="file">{{ file }}</option>
     </select>
   </div>
-  <button @click="toggleEditMode"
+  <button v-if="selectedFile.length > 0" @click="toggleEditMode"
     class="absolute bottom-[25px] right-1/2 md:right-[25px] transform translate-x-1/2 md:translate-x-0 bg-orange-custom text-white font-semibold px-4 py-2 rounded-xl border border-white ">
     {{ editMode ? 'Toggle placement off' : 'Place Marker' }}
   </button>
@@ -19,7 +21,6 @@
 
 <script setup>
 import * as WEBIFC from "web-ifc";
-import * as BUI from "@thatopen/ui";
 import * as OBC from "@thatopen/components";
 import * as THREE from "three";
 import { onMounted, onBeforeUnmount, ref, watch } from "vue";
@@ -40,36 +41,72 @@ const container = ref(null); // Reference for the container div
 let components = null;
 let world = null;
 let raycaster = new THREE.Raycaster(); // For detecting click positions
-let mouse = new THREE.Vector2(); // For storing mouse coordinates
+let mouse = new THREE.Vector2();
+let highlightedFragment = null;
 let sphere = null;
-let labelSprite = null;
 let currentModel = null;
 
+function highlightFragment(fragment) {
+  if (fragment && fragment.material[0]) {
+    // Check if fragment already has an original color stored
+    if (!fragment.userData.originalMaterial) {
+      // Clone the original material and store it in userData for restoration
+      fragment.userData.originalMaterial = fragment.material[0];
+    }
 
-function createTextSprite(message, fontSize = 24, color = "#ff0000") {
-  const canvas = document.createElement("canvas");
-  const context = canvas.getContext("2d");
+    // Create a new material with a highlighted color and assign it to the fragment
+    const highlightedMaterial = fragment.material[0].clone();
+    highlightedMaterial.color.set(0xff0000); // Set highlight color (e.g., red)
+    fragment.material[0] = highlightedMaterial; // Apply the new material to the fragment
+  }
+}
 
-  context.font = `${fontSize}px Arial`;
-  context.fillStyle = color;
+function removeHighlight() {
+  if (highlightedFragment && highlightedFragment.userData.originalMaterial) {
+    // Restore the original material from userData
+    highlightedFragment.material[0] = highlightedFragment.userData.originalMaterial;
+    highlightedFragment.userData.originalMaterial = null; // Clear the stored reference
+  }
+}
 
-  // Set canvas dimensions based on the text size
-  const textWidth = context.measureText(message).width;
-  canvas.width = textWidth + 20;
-  canvas.height = fontSize + 20;
+function onMouseMove(event) {
+  // Convert the mouse position to normalized device coordinates (-1 to +1 for both axes)
+  mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+  mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
 
-  // Re-set font and fill style after resizing
-  context.font = `${fontSize}px Arial`;
-  context.fillStyle = color;
-  context.textAlign = "center";
-  context.textBaseline = "middle";
-  context.fillText(message, canvas.width / 2, canvas.height / 2);
+  // Update the raycaster
+  raycaster.setFromCamera(mouse, world.camera.three);
 
-  const texture = new THREE.CanvasTexture(canvas);
-  const material = new THREE.SpriteMaterial({ map: texture });
-  const sprite = new THREE.Sprite(material);
+  // Check if FragmentsManager is available and if fragments are loaded
+  const fragmentsManager = components.get(OBC.FragmentsManager);
+  console.log([...fragmentsManager.list]);
+  if (!fragmentsManager || [...fragmentsManager.list].length === 0) {
+    console.error("FragmentsManager or fragments list is not available or empty.");
+    return;
+  }
 
-  return sprite;
+  // Get all fragment meshes
+  const fragmentMeshes = [...fragmentsManager.list].map((fragment) => fragment[1].mesh);
+
+  // Perform raycasting
+  // console.log(fragmentMeshes);
+  const intersects = raycaster.intersectObjects(fragmentMeshes, true);
+
+  // Check if any fragment is intersected
+  if (intersects.length > 0) {
+    console.log(intersects);
+    const intersectedFragment = intersects[0].object;
+
+    // Only highlight if it’s a new fragment
+    if (highlightedFragment !== intersectedFragment) {
+      removeHighlight(); // Remove highlight from previous fragment
+      highlightFragment(intersectedFragment); // Highlight the new fragment
+      highlightedFragment = intersectedFragment;
+    }
+  } else {
+    removeHighlight(); // Remove highlight if no fragment is intersected
+    highlightedFragment = null;
+  }
 }
 
 // Function to add a custom polygon at a given 3D position
@@ -113,9 +150,6 @@ function getClosestFragment(intersectPoint) {
   let closestFragment = null;
   let closestDistance = Infinity;
   let fragmentNormal = null;
-
-  console.log("FRAGMENTS");
-  console.log(fragments);
 
   // Check if fragments are available and ensure they're processed as expected
   if (fragments.list) {
@@ -237,7 +271,6 @@ async function loadIfc() {
   }
 
   if (selectedFile.value.length > 0) {
-    const fragments = components.get(OBC.FragmentsManager);
     const fragmentIfcLoader = components.get(OBC.IfcLoader);
 
     const file = await fetch(selectedFile.value); // Use the selected file
@@ -245,6 +278,13 @@ async function loadIfc() {
     const buffer = new Uint8Array(data);
     currentModel = await fragmentIfcLoader.load(buffer); // Load the new model
     currentModel.name = "example";
+    const box = new THREE.Box3().setFromObject(currentModel); // Get the bounding box of the model
+    const center = box.getCenter(new THREE.Vector3());        // Calculate the center of the bounding box
+
+    // Offset the model to center it at (0, 0, 0)
+    currentModel.position.sub(center); // Shift the model by its center to align with the scene's origin
+
+    // Add the new model to the scene
     world.scene.three.add(currentModel); // Add new model to the scene
   }
 }
@@ -306,6 +346,7 @@ onMounted(async () => {
     world.camera.three.updateProjectionMatrix();
 
     container.value.addEventListener("click", onDocumentMouseClick);
+    container.value.addEventListener("mousemove", onMouseMove);
   }
 });
 
