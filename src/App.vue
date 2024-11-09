@@ -1,7 +1,8 @@
 <template>
   <div v-show="selectedFile.length > 0" ref="container" class="fixed w-screen h-screen top-0 left-0">
   </div>
-  <div :class="[selectedFile.length > 0 ? 'left-2 top-2' : 'left-1/2 top-12 -translate-x-1/2']"
+  <div v-if="!selectedFileFromQuery"
+    :class="[selectedFile.length > 0 ? 'left-2 top-2' : 'left-1/2 top-12 -translate-x-1/2']"
     class="absolute tranform max-w-[480px] p-2 bg-white rounded">
     <select v-model="selectedFile" @change="loadIfc" id="countries"
       class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg block w-full p-2.5">
@@ -9,8 +10,8 @@
       <option v-for="(file, index) in ifcFiles" :value="file">{{ file }}</option>
     </select>
   </div>
-  <button v-if="selectedFile.length > 0" @click="toggleEditMode"
-    class="absolute top-[60px] right-1/2 md:right-[25px] transform translate-x-1/2 md:translate-x-0 bg-orange-custom text-white font-semibold px-4 py-2 rounded-xl border border-white ">
+  <button v-if="selectedFile.length > 0 && selectedFileFromQuery" @click="toggleEditMode"
+    class="absolute top-[60px] md:top-[25px] right-1/2 md:right-[25px] transform translate-x-1/2 md:translate-x-0 bg-orange-custom text-white font-semibold px-4 py-2 rounded-xl border border-white ">
     {{ editMode ? 'Toggle placement off' : 'Place Marker' }}
   </button>
   <!-- <button v-if="editMode" @click="savePosition"
@@ -61,7 +62,8 @@ let ifcFiles = [
   'https://maciejaroslaw.github.io/output.ifc',
 ]
 
-let selectedFile = ref('')
+const selectedFile = ref('');
+const selectedFileFromQuery = ref(false);
 
 const editMode = ref(false);
 function toggleEditMode() {
@@ -79,25 +81,42 @@ let currentModel = null;
 
 function moveCamera(direction) {
   const camera = world.camera.three;
-  const moveStep = 2; // Adjusts camera movement speed
+  const controls = world.camera.controls;
+  const moveDistance = 2; // Adjust this value to control movement speed
+
+  // Get the current position of the camera
+  console.log(controls);
+
+  const currentPosition = camera.position.clone();
+  const currentTarget = controls.target.clone();
 
   switch (direction) {
     case 'up':
-      camera.position.y += moveStep;
+      // Move the camera up
+      currentPosition.y += moveDistance;
+      currentTarget.y += moveDistance;
       break;
     case 'down':
-      camera.position.y -= moveStep;
+      // Move the camera down
+      currentPosition.y -= moveDistance;
+      currentTarget.y -= moveDistance;
       break;
     case 'left':
-      camera.position.x -= moveStep;
+      // Move the camera to the left
+      currentPosition.x -= moveDistance;
+      currentTarget.x -= moveDistance;
       break;
     case 'right':
-      camera.position.x += moveStep;
+      // Move the camera to the right
+      currentPosition.x += moveDistance;
+      currentTarget.x += moveDistance;
       break;
   }
 
-  // Update the camera controls to reflect the new position
-  world.camera.controls.update();
+  // Update the camera position and controls target
+  camera.position.copy(currentPosition);
+  controls.target.copy(currentTarget);
+  controls.update();
 }
 
 function onMouseMove(event) {
@@ -340,6 +359,12 @@ function savePosition() {
 onMounted(async () => {
   const searchParams = new URLSearchParams(window.location.search);
   const fileParam = searchParams.get("modelId");
+  const buildingId = searchParams.get("buildingId");
+
+  if (buildingId) {
+    selectedFile.value = buildingId;
+    selectedFileFromQuery.value = true;
+  }
 
   if (!container.value) return;
 
