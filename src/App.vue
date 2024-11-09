@@ -1,6 +1,12 @@
 <template>
   <div ref="container" class="container">
   </div>
+  <button @click="toggleEditMode" class="btn-toggle-edit">
+    {{ editMode ? 'Toggle Edit Mode Off' : 'Place Marker' }}
+  </button>
+  <button v-if="editMode" @click="savePosition" class="btn-save">
+    Save Position
+  </button>
 </template>
 
 <script setup>
@@ -11,12 +17,45 @@ import * as THREE from "three";
 
 import { onMounted, onBeforeUnmount, ref } from "vue";
 
+const editMode = ref(false);
+function toggleEditMode() {
+  editMode.value = !editMode.value;
+}
+
 const container = ref(null); // Reference for the container div
 let components = null;
 let world = null;
 let raycaster = new THREE.Raycaster(); // For detecting click positions
 let mouse = new THREE.Vector2(); // For storing mouse coordinates
+let sphere = null;
+let labelSprite = null;
 
+
+function createTextSprite(message, fontSize = 24, color = "#ff0000") {
+  const canvas = document.createElement("canvas");
+  const context = canvas.getContext("2d");
+
+  context.font = `${fontSize}px Arial`;
+  context.fillStyle = color;
+
+  // Set canvas dimensions based on the text size
+  const textWidth = context.measureText(message).width;
+  canvas.width = textWidth + 20;
+  canvas.height = fontSize + 20;
+
+  // Re-set font and fill style after resizing
+  context.font = `${fontSize}px Arial`;
+  context.fillStyle = color;
+  context.textAlign = "center";
+  context.textBaseline = "middle";
+  context.fillText(message, canvas.width / 2, canvas.height / 2);
+
+  const texture = new THREE.CanvasTexture(canvas);
+  const material = new THREE.SpriteMaterial({ map: texture });
+  const sprite = new THREE.Sprite(material);
+
+  return sprite;
+}
 
 // Function to add a custom polygon at a given 3D position
 function addCustomPolygon(position, normal) {
@@ -41,8 +80,16 @@ function addCustomPolygon(position, normal) {
   // Optionally align the sphere to the wall (if you want it to stick to the surface in a specific orientation)
   alignCuboidToWall(sphereMesh, normal);  // You can use the same alignment function for consistency
 
+  sphere = new THREE.Mesh(geometry, material);
+  sphere.position.copy(position);
   // Add the sphere to the scene
-  world.scene.three.add(sphereMesh);
+  world.scene.three.add(sphere);
+
+  const label = createTextLabel("CUSTOOM TEXT");
+  label.position.set(position.x, position.y + radius + 0.5, position.z); // Position label above the sphere
+  world.scene.three.add(label);
+
+  console.log("Sphere created:", sphere);
 }
 
 function getClosestFragment(intersectPoint) {
@@ -137,7 +184,7 @@ function alignCuboidToWall(cuboidMesh, normal) {
 
 // Function to handle mouse click and add a polygon at the clicked location
 function onDocumentMouseClick(event) {
-  if (event.ctrlKey) {
+  if (editMode.value) {
     event.preventDefault();
 
     mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
@@ -152,16 +199,14 @@ function onDocumentMouseClick(event) {
 
       // Find the closest fragment to the clicked point
       const { closestFragment, fragmentNormal } = getClosestFragment(intersectPoint);
-      console.log(closestFragment);
-      console.log(fragmentNormal);
-      if (closestFragment && fragmentNormal) {
-        addCustomPolygon(intersectPoint, fragmentNormal);
-        console.log("AAAA");
-        // Place the cuboid at the intersection point, aligned to the wall's normal
+      if (sphere) {
+        // If the sphere exists, move it to the clicked position
+        sphere.position.copy(intersectPoint);
+        console.log("Sphere moved to:", intersectPoint);
       } else {
-        // If no fragment is found, place the cuboid at the clicked location
-        addCustomPolygon(intersectPoint, new THREE.Vector3(0, 1, 0)); // Default to vertical alignment
-        console.log("BBB")
+        // If the sphere does not exist, create it at the clicked position
+        addCustomPolygon(intersectPoint, fragmentNormal);
+        // addSphere(intersectPoint);
       }
     }
   }
@@ -179,6 +224,10 @@ async function loadIfc() {
   const model = await fragmentIfcLoader.load(buffer);
   model.name = "example";
   world.scene.three.add(model);
+}
+
+function savePosition() {
+  console.log("SAVE");
 }
 
 // Initialize the OBC world when the component is mounted
@@ -202,7 +251,7 @@ onMounted(async () => {
     components.init();
 
     // Set camera controls
-    world.camera.controls.setLookAt(12, 6, 8, 0, 0, -10);
+    world.camera.controls.setLookAt(12, 26, 34, 0, 0, -10);
 
     // Set up the scene
     world.scene.setup();
@@ -217,9 +266,19 @@ onMounted(async () => {
     await fragmentIfcLoader.setup();
     fragmentIfcLoader.settings.webIfc.COORDINATE_TO_ORIGIN = true;
 
-    await loadIfc()
+    await loadIfc();
 
-    container.value.addEventListener("dblclick", onDocumentMouseClick);
+    const cameraPosition = world.camera.three.position;
+    const zoomFactor = 5; // Adjust this factor for the zoom-out level
+
+    // Move the camera back along its viewing direction
+    cameraPosition.z += zoomFactor;
+
+    // Update the camera position
+    world.camera.three.position.copy(cameraPosition);
+    world.camera.three.updateProjectionMatrix();
+
+    container.value.addEventListener("click", onDocumentMouseClick);
   }
 });
 
@@ -244,9 +303,16 @@ onBeforeUnmount(() => {
   left: 0;
 }
 
-.btn {
+.btn-toggle-edit {
   position: absolute;
-  top: 100px;
-  left: 100px;
+  bottom: 25px;
+  right: 25px;
+}
+
+.btn-save {
+  position: absolute;
+  bottom: 25px;
+  right: 250px;
+  background-color: green;
 }
 </style>
