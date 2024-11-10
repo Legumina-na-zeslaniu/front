@@ -316,7 +316,7 @@ async function loadIfc() {
 
     // Add the new model to the scene
     world.scene.three.add(currentModel); // Add new model to the scene
-    selectBuilding(selectedFile.value);
+    selectBuilding(selectedFile.value.id);
 
   }
 }
