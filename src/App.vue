@@ -2,12 +2,12 @@
   <div ref="container" class="fixed w-screen h-screen top-0 left-0">
   </div>
   <div v-if="!selectedFileFromQuery"
-    :class="[selectedFile.length > 0 ? 'left-0 md:left-2 top-2' : 'left-1/2 top-12 -translate-x-1/2']"
+    :class="[selectedFile.length > 0 ? 'left-0 md:left-2 top-2' : 'left-1/2 top-2 -translate-x-1/2']"
     class="absolute tranform max-w-[480px] w-full p-2 bg-white rounded">
     <select v-model="selectedFile" id="countries"
       class="bg-gray-50 border border-orange-custom text-sm rounded-full block w-full p-2.5 text-orange-custom font-semibold focus:outline-none">
       <option class="text-center" selected disabled value="">Choose builidng</option>
-      <option class="" v-for="(file, index) in ifcFiles" :value="file">{{ file }}</option>
+      <option class="" v-for="(file, index) in ifcFiles" :value="file">{{ file.name }}</option>
     </select>
   </div>
   <!--  -->
@@ -30,31 +30,22 @@ import { onMounted, onBeforeUnmount, ref, watch } from "vue";
 import { useQuery } from '@vue/apollo-composable'
 import gql from 'graphql-tag'
 
-// const { result } = useQuery(gql`
-//   query inventory {
-//     getAllInventory {
-//       id
-//       comments
-//       properties {
-//         field
-//         value
-//       }
-//       files
-//     }
-//   }
-// `)
+const { result } = useQuery(gql`
+  query models {
+  getIfcModels {
+    file
+    id
+    name
+  }
+}
+`)
 
-// watch(result, value => {
-//   console.log(value)
-// })
+const ifcFiles = ref([]);
 
-let ifcFiles = [
-  'https://maciejaroslaw.github.io/Kaapelitehdas_junction.ifc',
-  'https://maciejaroslaw.github.io/YhdistettyTATE_ARK_1.ifc',
-  'https://maciejaroslaw.github.io/2_simple_wall_1731162115.0929956.ifc',
-  'https://maciejaroslaw.github.io/model-1731162225487.ifc',
-  'https://maciejaroslaw.github.io/output.ifc',
-]
+watch(result, value => {
+  console.log(value);
+  ifcFiles.value = [...value.getIfcModels];
+})
 
 const selectedFile = ref('');
 const selectedFileFromQuery = ref(false);
@@ -308,11 +299,11 @@ async function loadIfc() {
     currentModel = null;
   }
 
-  if (selectedFile.value.length > 0) {
+  console.log(selectedFile.value);
+  if (selectedFile.value) {
     const fragmentIfcLoader = await components.get(OBC.IfcLoader);
 
-    console.log(selectedFile.value)
-    const file = await fetch(selectedFile.value); // Use the selected file
+    const file = await fetch(selectedFile.value.file); // Use the selected file
     const data = await file.arrayBuffer();
     const buffer = new Uint8Array(data);
     currentModel = await fragmentIfcLoader.load(buffer); // Load the new model
