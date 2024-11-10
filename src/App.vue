@@ -41,14 +41,23 @@ const { result } = useQuery(gql`
 `)
 
 const ifcFiles = ref([]);
-
-watch(result, value => {
-  console.log(value);
-  ifcFiles.value = [...value.getIfcModels];
-})
+const buildingId = ref('');
 
 const selectedFile = ref('');
 const selectedFileFromQuery = ref(false);
+
+watch(result, value => {
+  ifcFiles.value = [...value.getIfcModels];
+  if (buildingId.value) {
+    let target = ifcFiles.value.find(file => file.id === buildingId.value);
+    if (target) {
+      selectedFile.value = target
+      selectedFileFromQuery.value = true
+    }
+  }
+})
+
+
 
 const editMode = ref(false);
 function toggleEditMode() {
@@ -339,13 +348,7 @@ function savePosition() {
 onMounted(async () => {
   const searchParams = new URLSearchParams(window.location.search);
   const fileParam = searchParams.get("modelId");
-  const buildingId = searchParams.get("buildingId");
-
-  console.log(buildingId)
-  if (buildingId) {
-    selectedFile.value = buildingId;
-    selectedFileFromQuery.value = true;
-  }
+  buildingId.value = searchParams.get("buildingId");
 
   // Create components
   components = new OBC.Components();
